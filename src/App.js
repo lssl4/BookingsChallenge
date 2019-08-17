@@ -33,12 +33,18 @@ const SubmitButton = props => {
 
 const columns = [
   { type: "string", id: "UserID" },
+  { type: "string", id: "UserName" },
+  { type: "string", id: "style", role: "style" },
   { type: "date", id: "Start" },
   { type: "date", id: "End" }
 ];
 
 class App extends Component {
-  state = {};
+  constructor(props) {
+    super(props);
+    this.state = {};
+    this.onDrop = this.onDrop.bind(this);
+  }
 
   formatData(dateBookings) {
     const rows = [];
@@ -46,8 +52,10 @@ class App extends Component {
       for (const booking of bookings) {
         rows.push([
           "User " + booking.userId,
-          new Date(parseInt(bookingDate)),
-          new Date(parseInt(bookingDate) + parseInt(booking.duration))
+          booking.userId,
+          booking.existing ? "#157EF9" : "#DC4C22",
+          new Date(parseInt(bookingDate, 10)),
+          new Date(parseInt(bookingDate, 10) + parseInt(booking.duration, 10))
         ]);
       }
     }
@@ -64,7 +72,20 @@ class App extends Component {
   }
 
   onDrop(files) {
-    console.log(files);
+    var myHeaders = new Headers();
+    myHeaders.append("Content-Type", "text/csv");
+
+    var formData = new FormData();
+    formData.append("csvFile", files[0]);
+
+    fetch(`${apiUrl}/bookings`, {
+      method: "POST",
+      body: formData
+    })
+      .then(response => response.json())
+      .then(bookings => {
+        this.setState({ bookings: this.formatData(bookings) });
+      });
   }
 
   render() {
@@ -78,8 +99,8 @@ class App extends Component {
         <div className="App-main">
           <p>Existing bookings:</p>
           {(this.state.bookings || []).map((booking, i) => {
-            const startDate = booking[2];
-            const duration = booking[3] - booking[2];
+            const startDate = booking[3];
+            const duration = booking[4] - booking[3];
             return (
               <p key={i} className="App-booking">
                 <span className="App-booking-time">{startDate.toString()}</span>
