@@ -1,19 +1,26 @@
-const express = require('express');
-const cors = require('cors');
-const fs = require('fs');
+const express = require("express");
+const cors = require("cors");
+const fs = require("fs");
 
 const app = express();
 app.use(cors()); // so that app can access
 
-const bookings = JSON.parse(fs.readFileSync('./server/bookings.json'))
-  .map((bookingRecord) => ({
-    time: Date.parse(bookingRecord.time),
-    duration: bookingRecord.duration * 60 * 1000, // mins into ms
-    userId: bookingRecord.user_id,
-  }))
+const bookingsExtracted = {};
 
-app.get('/bookings', (_, res) => {
-  res.json(bookings);
+JSON.parse(fs.readFileSync("./server/bookings.json")).map(bookingRecord => {
+  var entries = bookingsExtracted[Date.parse(bookingRecord.time)] || [];
+
+  entries.push({
+    userId: bookingRecord.user_id,
+    duration: bookingRecord.duration * 60 * 1000, //mins into ms
+    existing: true
+  });
+
+  bookingsExtracted[Date.parse(bookingRecord.time)] = entries;
+});
+
+app.get("/bookings", (_, res) => {
+  res.json(bookingsExtracted);
 });
 
 app.listen(3001);
