@@ -64,14 +64,14 @@ class SubmitButton extends Component {
 class App extends Component {
   constructor(props) {
     super(props);
-    this.state = { bookings: {}, rawBookings: [] };
+    this.state = { formattedBookings: {}, rawBookings: [] };
     this.onDrop = this.onDrop.bind(this);
     this.formatBookings = this.formatBookings.bind(this);
   }
 
   formatBookingsForChart(formattedBookings) {
     const rows = [];
-    for (const [bookingDate, bookings] of Object.entries(formattedBookings)) {
+    for (const [bookingTime, bookings] of Object.entries(formattedBookings)) {
       for (const booking of bookings) {
         rows.push([
           "User " + booking.userId,
@@ -81,8 +81,8 @@ class App extends Component {
             : booking.isCurrent
             ? "#157EF9"
             : "#2FD566",
-          new Date(parseInt(bookingDate, 10)),
-          new Date(parseInt(bookingDate, 10) + booking.duration)
+          new Date(parseInt(bookingTime, 10)),
+          new Date(parseInt(bookingTime, 10) + booking.duration)
         ]);
       }
     }
@@ -90,12 +90,12 @@ class App extends Component {
     return rows;
   }
 
-  formatBookings(bookings, isCurrent) {
-    var bookingRecordsCopy = this.state.bookings;
+  formatBookings(newRawBookings, isCurrent) {
+    var formattedBookings = this.state.formattedBookings;
     var rawBookings = this.state.rawBookings;
-    for (const booking of bookings) {
-      const bookingRecordDate = Date.parse(booking.time);
-      const bookingEntries = bookingRecordsCopy[bookingRecordDate] || [];
+    for (const booking of newRawBookings) {
+      const bookingTime = Date.parse(booking.time);
+      const bookingEntries = formattedBookings[bookingTime] || [];
 
       bookingEntries.push({
         userId: booking.user_id || booking.userId,
@@ -104,14 +104,14 @@ class App extends Component {
         hasConflicts: bookingEntries.length >= 1 ? true : false
       });
 
-      if (bookingEntries.length == 1) {
+      if (bookingEntries.length === 1) {
         rawBookings.push(booking);
       }
 
-      bookingRecordsCopy[bookingRecordDate] = bookingEntries;
+      formattedBookings[bookingTime] = bookingEntries;
     }
 
-    return bookingRecordsCopy;
+    return formattedBookings;
   }
 
   componentWillMount() {
@@ -119,7 +119,7 @@ class App extends Component {
       .then(response => response.json())
       .then(bookings => {
         this.setState({
-          bookings: this.formatBookings(bookings, true)
+          formattedBookings: this.formatBookings(bookings, true)
         });
       });
   }
@@ -127,41 +127,41 @@ class App extends Component {
   onDrop(files) {
     var csvBookings = [];
 
-    for (const file of files) {
-      var fileReader = new FileReader();
+    var fileReader = new FileReader();
 
-      fileReader.setState = this.setState.bind(this);
-      fileReader.formatBookings = this.formatBookings.bind(this);
+    fileReader.setState = this.setState.bind(this);
+    fileReader.formatBookings = this.formatBookings.bind(this);
 
-      fileReader.onload = function(e) {
-        var buffer = fileReader.result;
+    fileReader.onload = function(e) {
+      var buffer = fileReader.result;
 
-        var myReadableStreamBuffer = new streamBuffers.ReadableStreamBuffer({
-          frequency: 10,
-          chunkSize: 2048
-        });
+      var myReadableStreamBuffer = new streamBuffers.ReadableStreamBuffer({
+        frequency: 10,
+        chunkSize: 2048
+      });
 
-        myReadableStreamBuffer.setState = this.setState.bind(this);
-        myReadableStreamBuffer.formatBookings = this.formatBookings.bind(this);
+      myReadableStreamBuffer.setState = this.setState.bind(this);
+      myReadableStreamBuffer.formatBookings = this.formatBookings.bind(this);
 
-        myReadableStreamBuffer.put(Buffer.from(buffer));
-        myReadableStreamBuffer.stop();
+      myReadableStreamBuffer.put(Buffer.from(buffer));
+      myReadableStreamBuffer.stop();
 
-        myReadableStreamBuffer
-          .pipe(
-            csv({
-              mapHeaders: ({ header, index }) => header.trim(),
-              mapValues: ({ header, index, value }) => value.trim()
-            })
-          )
-          .on("data", data => csvBookings.push(data))
-          .on("end", () => {
-            this.setState({
-              bookings: this.formatBookings(csvBookings, false)
-            });
+      myReadableStreamBuffer
+        .pipe(
+          csv({
+            mapHeaders: ({ header, index }) => header.trim(),
+            mapValues: ({ header, index, value }) => value.trim()
+          })
+        )
+        .on("data", data => csvBookings.push(data))
+        .on("end", () => {
+          this.setState({
+            formattedBookings: this.formatBookings(csvBookings, false)
           });
-      };
+        });
+    };
 
+    for (const file of files) {
       fileReader.readAsArrayBuffer(file.slice());
     }
   }
@@ -175,7 +175,7 @@ class App extends Component {
           </Dropzone>
         </div>
         <div className="App-main">
-          <p>Existing bookings:</p>
+          <p>Existing Bookings:</p>
           <br />
           <div id="chart_div">
             <Chart
@@ -184,7 +184,7 @@ class App extends Component {
               chartType="Timeline"
               loader={<div>Loading Chart</div>}
               data={[columns].concat(
-                this.formatBookingsForChart(this.state.bookings || {})
+                this.formatBookingsForChart(this.state.formattedBookings || {})
               )}
             />
           </div>
