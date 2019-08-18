@@ -10,32 +10,28 @@ const app = express();
 app.use(cors()); // so that app can access
 app.use(express.json());
 
-const bookingsExtracted = {};
+const currentBookings = JSON.parse(
+  fs.readFileSync("./server/bookings.json")
+).map(bookingRecord => ({
+  time: bookingRecord.time,
+  duration: bookingRecord.duration,
+  userId: bookingRecord.user_id
+}));
 
-function formatBookings(bookingRecord, isOldRecord) {
-  var entries = bookingsExtracted[Date.parse(bookingRecord.time)] || [];
-
-  entries.push({
-    userId: bookingRecord.user_id || bookingRecord.userId,
-    duration: bookingRecord.duration * 60 * 1000, //mins into ms
-    existing: isOldRecord
-  });
-
-  bookingsExtracted[Date.parse(bookingRecord.time)] = entries;
-}
-
-JSON.parse(fs.readFileSync("./server/bookings.json")).map(bookingRecord => {
-  formatBookings(bookingRecord, true);
-});
+var combinedBookings = {};
 
 app.get("/bookings", (req, res) => {
-  res.json(bookingsExtracted);
+  res.json(currentBookings);
 });
 
-app.post("/bookings", upload.single("csvFile"), (req, res, next) => {
-  const results = [];
+app.post("/bookings", (req, res) => {
+  res.json(currentBookings);
+});
 
-  const myReadableStreamBuffer = new streamBuffers.ReadableStreamBuffer({
+app.post("/upload", upload.single("csvFile"), (req, res, next) => {
+  var csvBookings = [];
+
+  var myReadableStreamBuffer = new streamBuffers.ReadableStreamBuffer({
     frequency: 10,
     chunkSize: 2048
   });
@@ -50,13 +46,11 @@ app.post("/bookings", upload.single("csvFile"), (req, res, next) => {
         mapValues: ({ header, index, value }) => value.trim()
       })
     )
-    .on("data", data => results.push(data))
+    .on("data", data => csvBookings.push(data))
     .on("end", () => {
-      results.map(bookingRecord => {
-        formatBookings(bookingRecord, false);
-      });
+      combinedBookings = formatBookings(currentBookings, csvBookings, false);
 
-      res.json(bookingsExtracted);
+      res.json(combinedBookings);
     });
 });
 
