@@ -7,39 +7,6 @@ import streamBuffers from "stream-buffers";
 
 const apiUrl = "http://localhost:3001";
 
-const ResetButton = props => {
-  return (
-    <a
-      className="btn btn-primary"
-      role="button"
-      href="/reset"
-      style={{ marginLeft: "10px", marginRight: "10px" }}
-    >
-      Reset
-    </a>
-  );
-};
-
-const SubmitButton = props => {
-  return (
-    /*<form method="post" action="/bookings">
-      <input type="hidden" name="bookings" value="extra_submit_value">
-      <button type="submit" name="submit_param" value="submit_value" class="link-button">
-        This is a link that sends a POST request
-      </button>
-    </form>*/
-
-    <a
-      className="btn btn-primary"
-      role="button"
-      href="/bookings"
-      style={{ marginLeft: "10px", marginRight: "10px" }}
-    >
-      Submit
-    </a>
-  );
-};
-
 const columns = [
   { type: "string", id: "UserID" },
   { type: "string", id: "UserName" },
@@ -48,10 +15,56 @@ const columns = [
   { type: "date", id: "End" }
 ];
 
+const ResetButton = props => {
+  return (
+    <a
+      className="btn btn-primary"
+      role="button"
+      href="/bookings"
+      style={{ marginLeft: "10px", marginRight: "10px" }}
+    >
+      Reset
+    </a>
+  );
+};
+
+class SubmitButton extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {};
+    this.submit = this.submit.bind(this);
+  }
+
+  submit() {
+    fetch(`${apiUrl}/bookings`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(this.props.newRawBookings)
+    });
+  }
+
+  render() {
+    return (
+      <a
+        className="btn btn-primary"
+        role="button"
+        href="/bookings"
+        style={{ marginLeft: "10px", marginRight: "10px" }}
+        onClick={this.submit}
+      >
+        Submit
+      </a>
+    );
+  }
+}
+
 class App extends Component {
   constructor(props) {
     super(props);
-    this.state = { bookings: {} };
+    this.state = { bookings: {}, rawBookings: [] };
     this.onDrop = this.onDrop.bind(this);
     this.formatBookings = this.formatBookings.bind(this);
   }
@@ -79,6 +92,7 @@ class App extends Component {
 
   formatBookings(bookings, isCurrent) {
     var bookingRecordsCopy = this.state.bookings;
+    var rawBookings = this.state.rawBookings;
     for (const booking of bookings) {
       const bookingRecordDate = Date.parse(booking.time);
       const bookingEntries = bookingRecordsCopy[bookingRecordDate] || [];
@@ -87,13 +101,11 @@ class App extends Component {
         userId: booking.user_id || booking.userId,
         duration: booking.duration * 60 * 1000, // mins to ms
         isCurrent: isCurrent,
-        hasConflicts: false
+        hasConflicts: bookingEntries.length >= 1 ? true : false
       });
 
-      if (bookingEntries.length > 1) {
-        bookingEntries.forEach((item, index) => {
-          item.hasConflicts = true;
-        });
+      if (bookingEntries.length == 1) {
+        rawBookings.push(booking);
       }
 
       bookingRecordsCopy[bookingRecordDate] = bookingEntries;
@@ -106,7 +118,9 @@ class App extends Component {
     fetch(`${apiUrl}/bookings`)
       .then(response => response.json())
       .then(bookings => {
-        this.setState({ bookings: this.formatBookings(bookings, true) });
+        this.setState({
+          bookings: this.formatBookings(bookings, true)
+        });
       });
   }
 
@@ -162,19 +176,6 @@ class App extends Component {
         </div>
         <div className="App-main">
           <p>Existing bookings:</p>
-          {/*(this.state.bookings || {}).map((booking, i) => {
-            const startDate = booking.time;
-            const duration = booking.duration;
-            return (
-              <p key={i} className="App-booking">
-                <span className="App-booking-time">{startDate.toString()}</span>
-                <span className="App-booking-duration">
-                  {duration.toFixed(1)}
-                </span>
-                <span className="App-booking-user">{booking.userID}</span>
-              </p>
-            );
-          })*/}
           <br />
           <div id="chart_div">
             <Chart
@@ -189,7 +190,7 @@ class App extends Component {
           </div>
           <div>
             <ResetButton />
-            <SubmitButton />
+            <SubmitButton newRawBookings={this.state.rawBookings} />
           </div>
           <div />
         </div>
